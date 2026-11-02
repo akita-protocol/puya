@@ -2631,6 +2631,8 @@ class Contract(RootNode):
     """AVM version to target, defaults to options.target_avm_version"""
     autosalt: bool | None = None
     """Off-curve autosalt override. `None` leaves contracts unsalted (#pragma emitted on v>=13)"""
+    ui: str | None = None
+    """Optional ARC-56 `ui` extension for the contract, as a JSON object string"""
 
     @approval_program.validator
     def check_approval(self, _attribute: object, approval: ContractMethod) -> None:
@@ -2759,6 +2761,8 @@ class ARC4ABIMethodConfig:
     default_args: immutabledict[str, ABIMethodArgDefault] = immutabledict()
     """Mapping is from parameter -> source"""
     validate_encoding: bool | None = None
+    ui: str | None = None
+    """Optional ARC-56 `ui` extension for this method, as a JSON object string"""
 
 
 ARC4MethodConfig = ARC4BareMethodConfig | ARC4ABIMethodConfig

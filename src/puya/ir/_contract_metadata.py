@@ -98,10 +98,13 @@ def _validate_ui(
     """
     if ui is None:
         return None
+    error: str | None = None
     try:
         value = json.loads(ui)
     except json.JSONDecodeError as ex:
-        logger.error(f"ui extension is not valid JSON: {ex}", location=location)
+        error = str(ex)
+    if error is not None:
+        logger.error(f"ui extension is not valid JSON: {error}", location=location)
         return None
     if not isinstance(value, dict):
         logger.error("ui extension must be an object", location=location)

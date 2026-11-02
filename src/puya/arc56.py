@@ -1,5 +1,6 @@
 import base64
 import itertools
+import json
 import typing
 from collections import defaultdict
 from collections.abc import Iterable, Mapping, Sequence
@@ -97,6 +98,7 @@ def create_arc56(
                     apps=None,
                     assets=None,
                 ),
+                ui=_decode_ui(m.ui),
             )
             for m in abi_methods
         ],
@@ -163,7 +165,16 @@ def create_arc56(
         },
         # TODO: provide a way for contracts to declare "public" scratch vars
         scratchVariables=None,
+        ui=_decode_ui(metadata.ui),
     )
+
+
+def _decode_ui(ui: str | None) -> Mapping[str, object] | None:
+    if ui is None:
+        return None
+    value = json.loads(ui)
+    assert isinstance(value, dict), "ui extension should have been validated as an object"
+    return value
 
 
 def create_arc56_json(

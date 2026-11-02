@@ -1,4 +1,5 @@
 import contextlib
+import json
 import typing
 from collections import Counter
 from collections.abc import Iterable, Iterator, Mapping, Sequence
@@ -79,8 +80,53 @@ def build_contract_metadata(
         state_totals=state_totals,
         structs=immutabledict(structs),
         template_variable_types=immutabledict(template_var_types),
+        ui=_validate_ui(contract.ui, contract.source_location, arg_names=None),
     )
     return metadata, arc4_method_data
+
+
+_UI_METHOD_STRING_KEYS = ("action", "glyph", "label")
+
+
+def _validate_ui(
+    ui: str | None, location: SourceLocation, *, arg_names: Sequence[str] | None
+) -> str | None:
+    """
+    Check that an ARC-56 `ui` extension is a JSON object, and for a method that its
+    well-known keys have the right shape and that `card.bind` only names real arguments.
+    Unknown keys are kept as-is, so the extension can grow without compiler changes.
+    """
+    if ui is None:
+        return None
+    try:
+        value = json.loads(ui)
+    except json.JSONDecodeError as ex:
+        logger.error(f"ui extension is not valid JSON: {ex}", location=location)
+        return None
+    if not isinstance(value, dict):
+        logger.error("ui extension must be an object", location=location)
+        return None
+    if arg_names is not None:
+        for key in _UI_METHOD_STRING_KEYS:
+            if key in value and not isinstance(value[key], str):
+                logger.error(f"ui.{key} must be a string", location=location)
+        card = value.get("card")
+        if card is not None:
+            if not isinstance(card, dict):
+                logger.error("ui.card must be an object", location=location)
+            else:
+                bind = card.get("bind")
+                if bind is not None:
+                    if not isinstance(bind, dict):
+                        logger.error("ui.card.bind must be an object", location=location)
+                    else:
+                        for name in bind:
+                            if name not in arg_names:
+                                logger.error(
+                                    f"ui.card.bind names unknown argument {name!r}",
+                                    location=location,
+                                )
+    return json.dumps(value, separators=(",", ":"))
 
 
 def _translate_state(state: awst_nodes.AppStorageDefinition) -> models.ContractState:
@@ -346,6 +392,12 @@ def _abi_method_metadata(
 ) -> models.ARC4ABIMethod:
     assert config is m.arc4_method_config
     default_args = convert_default_args(ctx, contract, m, config)
+    if config.ui is not None:
+        validated_ui = _validate_ui(
+            config.ui, config.source_location, arg_names=[a.name for a in m.args]
+        )
+        if validated_ui != config.ui:
+            config = attrs.evolve(config, ui=validated_ui)
     use_reference_alias = config.resource_encoding == "index"
     args = [
         models.ARC4MethodArg(

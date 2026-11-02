@@ -119,6 +119,10 @@ class ARC4ABIMethod:
     def validate_encoding(self) -> bool | None:
         return self._config.validate_encoding
 
+    @property
+    def ui(self) -> str | None:
+        return self._config.ui
+
 
 @attrs.frozen(kw_only=True)
 class ARC4BareMethod:
@@ -184,6 +188,8 @@ class ContractMetaData:
     structs: immutabledict[str, ARC4Struct]
     template_variable_types: immutabledict[str, str]
     """Mapping of template variable names to their ARC-56 type"""
+    ui: str | None = None
+    """Optional ARC-56 `ui` extension for the contract, as a JSON object string"""
 
     @property
     def is_arc4(self) -> bool:

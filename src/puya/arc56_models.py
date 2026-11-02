@@ -236,6 +236,11 @@ class Method:
     """ARC-28 events that MAY be emitted by this method"""
     recommendations: MethodRecommendations | None = None
     """Information that clients can use when calling the method"""
+    ui: Mapping[str, object] | None = None
+    """
+    Optional presentation extension: icon, label, action and an optional card describing
+    how a client can build a call to this method
+    """
 
 
 @attrs.frozen
@@ -362,3 +367,5 @@ class Contract:
     """
     scratchVariables: Mapping[str, ScratchVariable] | None = None
     """The scratch variables used during runtime"""
+    ui: Mapping[str, object] | None = None
+    """Optional presentation extension for the contract as a whole, e.g. its icon and color"""

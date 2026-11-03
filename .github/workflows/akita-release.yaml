@@ -5,11 +5,12 @@ name: Akita fork release
 # `puya-<version>-<platform>.tar.gz` and its `.sha256.txt` from the release
 # tagged `v<version>`, so the tag must match its `targetedPuyaVersion`.
 #
-# Run it by pushing a tag such as `v5.10.1-akita.1`, or from the Actions tab.
+# Run it by pushing a branch named `akita-release/<tag>`, e.g.
+# `akita-release/v5.10.1-akita.1`; the release tag is created on that commit.
 
 on:
   push:
-    tags: ["v*-akita.*"]
+    branches: ["akita-release/**"]
   workflow_dispatch:
     inputs:
       tag:
@@ -18,6 +19,9 @@ on:
         type: string
 
 concurrency: akita-release-${{ github.event.inputs.tag || github.ref_name }}
+
+permissions:
+  contents: write
 
 jobs:
   version:
@@ -30,6 +34,7 @@ jobs:
         shell: bash
         run: |
           tag="${{ github.event.inputs.tag || github.ref_name }}"
+          tag="${tag#akita-release/}"
           [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-akita\.[0-9]+$ ]] || { echo "Bad tag: $tag" >&2; exit 1; }
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "version=${tag#v}" >> "$GITHUB_OUTPUT"

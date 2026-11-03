@@ -1,0 +1,70 @@
+name: Akita fork release
+
+# Builds the puya binaries for every platform puya-ts downloads, and publishes
+# them as a GitHub release on this fork. puya-ts (akita-protocol fork) fetches
+# `puya-<version>-<platform>.tar.gz` and its `.sha256.txt` from the release
+# tagged `v<version>`, so the tag must match its `targetedPuyaVersion`.
+#
+# Run it by pushing a tag such as `v5.10.1-akita.1`, or from the Actions tab.
+
+on:
+  push:
+    tags: ["v*-akita.*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag, e.g. v5.10.1-akita.1 (created from the selected branch if missing)"
+        required: true
+        type: string
+
+concurrency: akita-release-${{ github.event.inputs.tag || github.ref_name }}
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.v.outputs.tag }}
+      version: ${{ steps.v.outputs.version }}
+    steps:
+      - id: v
+        shell: bash
+        run: |
+          tag="${{ github.event.inputs.tag || github.ref_name }}"
+          [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-akita\.[0-9]+$ ]] || { echo "Bad tag: $tag" >&2; exit 1; }
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
+
+  build-binaries:
+    needs: version
+    uses: ./.github/workflows/build-binaries.yaml
+    with:
+      python_version: "3.13"
+      package_prefix: "puya-${{ needs.version.outputs.version }}"
+      allow_signing: false
+      run_manylinux_tests: false
+      git_ref: ${{ github.sha }}
+
+  release:
+    needs: [version, build-binaries]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download binaries
+        uses: actions/download-artifact@v4
+        with:
+          path: bdist
+          pattern: puya-${{ needs.version.outputs.version }}-*
+          merge-multiple: true
+
+      - name: Publish release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.version.outputs.tag }}
+        run: |
+          ls -la bdist
+          notes="puya with the ARC-56 \`ui\` extension (akita-protocol fork). Built from ${GITHUB_SHA}. Unsigned."
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 \
+            || gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "$TAG" --notes "$notes" --prerelease
+          gh release upload "$TAG" bdist/*.tar.gz bdist/*.sha256.txt --repo "$GITHUB_REPOSITORY" --clobber
